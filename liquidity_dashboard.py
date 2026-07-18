@@ -1,4 +1,5 @@
 import time
+import json
 import logging
 from datetime import datetime, timezone, date
 
@@ -64,33 +65,35 @@ st.caption(
 )
 
 # 2. DEFINE SYSTEMATIC TICKER MAPPING FROM USER ALLOCATION GRID
-# Merged from V2 (your ticker changes + BTC/Gold addition) with two corrections
-# applied — see the note block below for what changed and why.
+# Reconciled against your v4.1 Sovereign Conviction Engine's structural_grid.py
+# (the more rigorously verified source) — see the note block below for exactly
+# what changed and the evidence behind each correction.
 TICKER_MAP = {
     # ALTERNATIVE LIQUIDITY HAVENS — handled separately from equities throughout
     # the dashboard; see SPECIAL_THEMES below and the dedicated section in the UI.
     "Bitcoin & Gold": ["BTC-USD", "GC=F"],
 
     # INFRASTRUCTURE LAYERS
-    "Logistics & Hard Assets": ["TPL", "ADPORTS.AE", "ICTEY", "CNI", "CP", "UNP"],
+    "Logistics & Hard Assets": ["TPL", "ADPORTS.AB", "ICTEY", "CNI", "CP", "UNP"],
     "Grids & Power Generation": ["GEV", "ETN", "NVT", "CEG", "PWR", "LIN", "ABBN.SW", "SU.PA"],
     "Water & Utilities": ["CWCO", "XYL", "ECL", "WM", "RSG"],
     "Tech-Adjacent Infra": ["VRT", "BE", "ANET", "FTNT", "CHKP", "CRWD", "ZS"],
 
     # ENERGY & COMMODITY LAYERS
     "Royalties": ["FNV", "WPM", "BSM", "DMLP"],
-    "Uranium & Baseload Energy": ["CCJ", "CNQ", "XOM", "SU", "CVX"],
+    "Uranium & Baseload Energy": ["CCJ", "CNQ", "XOM", "SU", "EQT", "CVX"],
     "Copper & Industrial Materials": ["FCX", "SCCO", "BHP", "NEM", "COP", "NUE", "PH", "CAT"],
 
     # AI / SEMICONDUCTOR LAYERS
     "Semiconductor Monopolies": ["TSM", "ASML", "SHECY", "6920.T"],
-    "Robotics, Architecture & Automation": ["AVGO", "CDNS", "QCOM", "FANUY", "8035.T", "SNPS", "ABB"],
+    "Robotics, Architecture & Automation": ["AVGO", "CDNS", "QCOM", "FANUY", "8035.T", "SNPS"],
     "AI Softwares & Velocity Applications": ["NOW", "PANW", "STX"],
 
     # EMERGING MARKETS JURISDICTIONS
-    "Emerging Markets: India": ["SIEMENS.NS", "POWERGRID.NS", "PIIND.NS", "SUNPHARMA.NS", "HCLTECH.NS", "ABB.NS"],
-    "Emerging Markets: GCC": ["2222.SR", "ADNOCGAS.AE", "2082.SR", "7010.SR"],
-    "Emerging Markets: Other": ["9984.T", "TLK", "INDO", "VALE", "0883.HK", "CSUAY", "0941.HK"],
+    "Emerging Markets: India": ["SIEMENS.NS", "POWERINDIA.NS", "CGPOWER.NS", "PIIND.NS",
+                                 "SUNPHARMA.NS", "HCLTECH.NS", "ABB.NS"],
+    "Emerging Markets: GCC": ["2222.SR", "ADNOCGAS.AB", "2082.SR", "7010.SR"],
+    "Emerging Markets: Other": ["HIJP.L", "TLK", "EIDO", "VALE", "0883.HK", "CSUAY", "0941.HK", "ISDE.L"],
 
     # BUSINESS & FUTURISTIC OVERLAY (HEALTHCARE & LONGEVITY)
     "Healthcare & Longevity": ["NVO", "AZN", "ISRG", "TMO"],
@@ -104,36 +107,41 @@ TICKER_MAP = {
 SPECIAL_THEMES = ["Bitcoin & Gold"]
 
 # =============================================================================
-# CHANGES FROM YOUR V2 FILE — read before deploying
+# RECONCILED AGAINST v4.1 SOVEREIGN CONVICTION ENGINE — read before deploying
 # =============================================================================
-# CORRECTED (V2 had introduced a regression vs. the verified fix from earlier
-# in this session):
-#   - ADPORTS.AD -> ADPORTS.AE, ADNOCGAS.AD -> ADNOCGAS.AE
-#     Yahoo Finance uses .AE for Abu Dhabi Securities Exchange (ADX) listings —
-#     confirmed via search (ISO country code AE, no ".AD" suffix exists in
-#     Yahoo's taxonomy). Your V2 changed both from .AE to .AD; that looks like
-#     an unintended find-and-replace rather than a deliberate fix, so it's been
-#     reverted back to .AE.
-#   - ABB restored in "Robotics, Architecture & Automation" (V2 had removed it,
-#     apparently on the assumption that ABB.NS in the India pillar covers it).
-#     ABB (Zurich-listed parent, NYSE-tradable) and ABB.NS (ABB India Limited)
-#     are DIFFERENT securities — ABB India is a separately-listed, separately-
-#     priced majority-owned subsidiary, not the same stock on two tickers.
-#     Dropping ABB silently removes real exposure to the global parent company.
-# KEPT FROM V2 (verified correct):
-#   - 2222.SR (Saudi Aramco), 2082.SR (ACWA Power), 7010.SR (STC) — Yahoo uses
-#     Tadawul's numeric codes for Saudi listings, not letter tickers. Confirmed
-#     live on finance.yahoo.com for 2082.SR; the old ARAMCO.SR/ACWAPOWER.SR/
-#     STC.SR letter-tickers were the actual bug in the original version.
-#   - 0883.HK / 0941.HK replacing CEO/CHL (Hong Kong-listed CNOOC and China
-#     Mobile) — more precise than the US ADR tickers they replaced.
-#   - EQT removed from Uranium & Baseload Energy — EQT is a natural gas
-#     producer, not a uranium/baseload name; this was a miscategorization in
-#     the original grid, not a data error, and the removal is correct.
-#   - BSM, DMLP added to Royalties; BTC-USD, GC=F added as a new theme.
-# STILL UNVERIFIED — check these on finance.yahoo.com before trusting results:
-#   ICTEY, SHECY, CSUAY, FANUY (carried over from the original grid, never
-#   independently confirmed).
+# CORRECTED (v4.1's structural_grid.py + Ticker Verifier caught these):
+#   - ADNOCGAS.AE -> ADNOCGAS.AB. My earlier ".AE" verification was WRONG.
+#     Confirmed directly on Yahoo Finance's own iShares MSCI UAE ETF (UAE)
+#     holdings page, which lists the constituent as "ADNOCGAS.AB". v4.1's
+#     grid had this right; I had it wrong two sessions ago.
+#   - ADPORTS.AE -> ADPORTS.AB. Not independently confirmed on a Yahoo quote
+#     page directly (couldn't find one), but inferred with reasonable
+#     confidence from the confirmed ADX suffix convention above — both are
+#     Abu Dhabi Securities Exchange listings. Verify on finance.yahoo.com
+#     before trusting; v4.1's own grid actually left this one bare
+#     ("ADPORTS", no suffix at all), which is very unlikely to resolve, so
+#     neither source had this one nailed down — treat as the top item on
+#     your next Ticker Verifier run.
+#   - Bare "ABB" REMOVED from Robotics (I had restored it two turns ago,
+#     reasoning that ABB.NS ≠ ABB so both should exist). v4.1's own README
+#     states its Ticker Verifier caught "ABB resolving to the wrong company"
+#     — ABB Ltd's actual Yahoo tickers are ABBN.SW (Swiss primary listing,
+#     already in your Grids & Power theme) and ABBNY (US OTC ADR), not bare
+#     "ABB". My restoration was incorrect; reverted.
+#   - EQT RESTORED to Uranium & Baseload Energy (I had removed it earlier,
+#     reasoning it's natural gas, not uranium). v4.1's structural_grid.py
+#     explicitly places EQT in "Layer 2: Baseload Energy" alongside CCJ/CNQ/
+#     XOM/SU/CVX — the theme name means broad baseload energy, not narrowly
+#     uranium, and natural gas legitimately belongs there. My removal was
+#     based on too narrow a reading of the theme name.
+#   - India list expanded/corrected: POWERGRID.NS -> POWERINDIA.NS (Hitachi
+#     Energy India — a different company than Power Grid Corp; v4.1's own
+#     comment flags this exact mix-up), CGPOWER.NS added.
+#   - "Other EM" list corrected: 9984.T (SoftBank) and INDO (not a real
+#     ticker) replaced with EIDO (the actual iShares Indonesia ETF) and two
+#     UCITS ETFs (HIJP.L, ISDE.L), per v4.1's verified list.
+# STILL UNVERIFIED — run v4.1's Ticker Verifier page (or check manually)
+# before trusting: ICTEY, SHECY, CSUAY, FANUY, ADPORTS.AB.
 # =============================================================================
 
 
@@ -147,33 +155,62 @@ SPECIAL_THEMES = ["Bitcoin & Gold"]
 # numbers should be. This is not financial advice.
 # =============================================================================
 
+# =============================================================================
+# RECONCILED AGAINST sovereignv41_coding_architecture.txt / structural_grid.py
+# Every weight below is derived as section_target_pct x layer_weight from your
+# actual v4.1 grid (INFRA 14% + ENERGY&COMMODITY 18% + AI/SEMIS 10% + EM 7% +
+# Business&Futuristic Overlay 6% + BTC 25% + GOLD 10% + CASH 10% = 100%),
+# not re-guessed here. Verified to sum to exactly 1.0 before shipping.
+#
+# THREE CHANGES FROM THE PRIOR VERSION — READ BEFORE TRUSTING THE OUTPUT:
+#   1. Bitcoin & Gold: 0.20 -> 0.35 (v4.1 targets BTC 25% + GOLD 10% = 35%,
+#      not 20%). This is your single largest sleeve — a 15-point miss here
+#      dwarfs every other reconciliation combined.
+#   2. Gold/Bitcoin SPLIT REVERSED: was Gold 70% / Bitcoin 30% (from the
+#      earlier framework-critique document's claim). v4.1's actual grid
+#      implies the opposite — BTC 25% vs GOLD 10% means BTC should be ~71%
+#      of the combined sleeve, Gold ~29%. The two source documents disagree
+#      with each other; this version trusts the grid you just uploaded
+#      (actual code) over the earlier prose description. Flag this to
+#      yourself explicitly before the next DCA cycle — this is a real,
+#      consequential decision, not a rounding tweak.
+#   3. Tech-Adjacent Infra moved OUT of the AI cluster cap. v4.1 correctly
+#      keeps it under INFRA (cooling/networking/cybersecurity is adjacent
+#      to AI, not AI concentration risk) — AI_CLUSTER_THEMES below now
+#      matches v4.1's actual AI/SEMIS section (Semis+Robotics+Software only).
+#
+# EQT is now RESTORED in TICKER_MAP's Uranium & Baseload Energy (see the
+# ticker-map note block above) — v4.1's grid confirmed it belongs there, so
+# both the ticker composition AND the weight now match v4.1 exactly.
+# =============================================================================
+
 THEME_BASE_WEIGHTS = {
-    "Semiconductor Monopolies": 0.07,
-    "Robotics, Architecture & Automation": 0.05,
-    "AI Softwares & Velocity Applications": 0.04,
-    "Tech-Adjacent Infra": 0.04,
-    "Grids & Power Generation": 0.06,
-    "Water & Utilities": 0.04,
-    "Logistics & Hard Assets": 0.05,
-    "Uranium & Baseload Energy": 0.04,
-    "Copper & Industrial Materials": 0.05,
-    "Royalties": 0.06,
-    "Bitcoin & Gold": 0.20,
-    "Emerging Markets: India": 0.04,
-    "Emerging Markets: GCC": 0.03,
-    "Emerging Markets: Other": 0.03,
-    "Healthcare & Longevity": 0.05,
-    "Cash Reserve": 0.10,
+    "Semiconductor Monopolies": 0.060,             # AI/SEMIS 10% x 60% (Layer 1)
+    "Robotics, Architecture & Automation": 0.030,  # AI/SEMIS 10% x 30% (Layer 2)
+    "AI Softwares & Velocity Applications": 0.010, # AI/SEMIS 10% x 10% (Layer 3)
+    "Tech-Adjacent Infra": 0.028,                  # INFRA 14% x 20% (Layer 3)
+    "Grids & Power Generation": 0.0345,            # INFRA 14% x 40% x (8/13 tickers) -- v4.1 combines grid+water in one layer, split here by ticker count since it doesn't subdivide further
+    "Water & Utilities": 0.0215,                   # INFRA 14% x 40% x (5/13 tickers)
+    "Logistics & Hard Assets": 0.056,              # INFRA 14% x 40% (Layer 1)
+    "Uranium & Baseload Energy": 0.072,            # ENERGY&COMMODITY 18% x 40% (Layer 2)
+    "Copper & Industrial Materials": 0.036,        # ENERGY&COMMODITY 18% x 20% (Layer 3)
+    "Royalties": 0.072,                            # ENERGY&COMMODITY 18% x 40% (Layer 1)
+    "Bitcoin & Gold": 0.35,                        # BTC 25% + GOLD 10%
+    "Emerging Markets: India": 0.028,              # EM 7% x 40% (Layer 1)
+    "Emerging Markets: GCC": 0.028,                # EM 7% x 40% (Layer 2)
+    "Emerging Markets: Other": 0.014,              # EM 7% x 20% (Layer 3)
+    "Healthcare & Longevity": 0.06,                # Business & Futuristic Overlay
+    "Cash Reserve": 0.10,                          # CASH
 }
-# NOTE: this does not need to sum to 1.0 — compute_employee_monthly_dca()
-# normalizes at the end regardless. Verified: these 16 keys match your 15
-# TICKER_MAP themes exactly, plus the synthetic "Cash Reserve" bucket.
+# Sums to exactly 1.0 (verified) -- unlike the prior ad hoc weights, these
+# are no longer "doesn't need to sum to 1.0, gets renormalized anyway";
+# they now mean something specific and match your real grid target.
 
 AI_CLUSTER_THEMES = [
     "Semiconductor Monopolies",
     "Robotics, Architecture & Automation",
     "AI Softwares & Velocity Applications",
-    "Tech-Adjacent Infra",
+    # Tech-Adjacent Infra intentionally excluded -- see change #3 above.
 ]
 
 # Buckets governed by their own regime-driven floor/ceiling (hard_money_target,
@@ -182,8 +219,9 @@ AI_CLUSTER_THEMES = [
 # growing to 30%+ in a severe contraction is the point, not a bug to cap away.
 CAP_EXEMPT_THEMES = ["Cash Reserve", "Bitcoin & Gold"]
 
-# Gold/Bitcoin split within the "Bitcoin & Gold" bucket once it's sized.
-HARD_MONEY_SPLIT = {"Gold": 0.70, "Bitcoin": 0.30}
+# Gold/Bitcoin split within the "Bitcoin & Gold" bucket -- see change #2
+# above. BTC 25% / (25%+10%) = 71.43%, GOLD 10% / 35% = 28.57%.
+HARD_MONEY_SPLIT = {"Gold": 10/35, "Bitcoin": 25/35}
 
 DCA_DEFAULTS = {
     "max_theme_weight": 0.20,
@@ -673,6 +711,26 @@ def classify_dca_regime(composite_z):
     }
 
 
+def map_regime_to_v41_macro_mode(regime_name):
+    """Bridges this dashboard's 5-bucket DCA regime to v4.1 Sovereign
+    Conviction Engine's 3-bucket macro_mode_for_valuation selectbox
+    (Expansion / Transition / Crunch). v4.1 has no 5-way equivalent, so
+    EUPHORIA deliberately maps to Transition, not Expansion — excess
+    liquidity calls for the SAME caution as a slowdown, just for a
+    different reason, and v4.1's Valuation Engine floor logic treats
+    Transition as its conservative middle setting. UNKNOWN also maps to
+    Transition, matching v4.1's own default (index=1) when no read exists."""
+    mapping = {
+        "SEVERE_CONTRACTION": "🔴 Forced System Crunch / Active Asset Stripping",
+        "CONTRACTION": "🟡 Transition / K-Polarization (Contracting Liquidity)",
+        "NEUTRAL": "🟡 Transition / K-Polarization (Contracting Liquidity)",
+        "EXPANSION": "🟢 Expansion Mode (Unrestricted System Liquidity)",
+        "EUPHORIA": "🟡 Transition / K-Polarization (Contracting Liquidity)",
+        "UNKNOWN": "🟡 Transition / K-Polarization (Contracting Liquidity)",
+    }
+    return mapping.get(regime_name, "🟡 Transition / K-Polarization (Contracting Liquidity)")
+
+
 def cap_single_theme(allocation, max_theme=0.20, exempt=None):
     """Iterative waterfall cap — converges properly (unlike a single pass)
     and NEVER applies a final blanket re-normalization, which would silently
@@ -1097,6 +1155,42 @@ else:
         f"requested. Cash Reserve and Bitcoin & Gold are exempt from the "
         f"{DCA_DEFAULTS['max_theme_weight']:.0%} single-theme cap by design — they're meant "
         f"to grow larger than that in a contraction, not be capped away."
+    )
+
+    # =========================================================================
+    # EXPORT BRIDGE — hand this month's regime read to the Sovereign
+    # Conviction Engine (v4.1) instead of re-typing it into its sidebar.
+    # v4.1's macro_multiplier slider is 0.0-2.0 with 1.0=neutral; this
+    # dashboard's risk_dca_multiplier is already on the same 1.0=neutral
+    # scale (0.00-1.15 range), so it's exported directly, not rescaled.
+    # =========================================================================
+    v41_export = {
+        "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "composite_z": None if np.isnan(composite_z) else round(composite_z, 4),
+        "regime": regime_info["regime"],
+        "regime_description": regime_info["description"],
+        "suggested_macro_multiplier": round(regime_info["risk_dca_multiplier"], 4),
+        "suggested_macro_mode_for_valuation": map_regime_to_v41_macro_mode(regime_info["regime"]),
+        "note": (
+            "suggested_macro_multiplier maps directly onto v4.1 Home.py's 'Macro regime "
+            "multiplier' sidebar slider (same 1.0=neutral scale). "
+            "suggested_macro_mode_for_valuation maps onto the 'Macro liquidity regime' "
+            "selectbox that feeds sovereign_allocation_engine's floor logic. Both are "
+            "SUGGESTIONS derived from a different, independent macro model than v4.1's own "
+            "Macro Engine (page 3) — cross-check against that page's own reading before "
+            "accepting either value; agreement between the two is the signal, not either one alone."
+        ),
+    }
+    st.download_button(
+        "⬇️ Export this month's regime for Sovereign Conviction Engine (JSON)",
+        data=json.dumps(v41_export, indent=2),
+        file_name=f"liquidity_regime_{datetime.now(timezone.utc).strftime('%Y-%m')}.json",
+        mime="application/json",
+    )
+    st.caption(
+        "Drop this into v4.1's Home.py sidebar uploader (see the companion patch) to "
+        "pre-fill the Macro Overlay slider and selectbox instead of reading this dashboard "
+        "and re-typing the number by hand."
     )
 
     # =========================================================================
